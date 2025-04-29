@@ -8,7 +8,7 @@
             "name": "Python Debugger: Main File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/sdl3-example.py",
+            "program": "${workspaceFolder}/sdl3-simple.py",
             "console": "integratedTerminal"
         }
     ]
