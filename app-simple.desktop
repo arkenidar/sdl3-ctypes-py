@@ -1,0 +1,17 @@
+[Desktop Entry]
+Comment[it_IT]=
+Comment=
+Exec=python sdl3-simple.py
+GenericName[it_IT]=
+GenericName=
+Icon=system-run
+MimeType=
+Name[it_IT]=
+Name=
+Path=/home/arkenidar/Dropbox/github-work/sdl3-ctypes-py/
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=
