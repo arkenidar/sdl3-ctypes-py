@@ -1,3 +1,3 @@
-pip install --user pipenv
-pipenv install PySDL3
-pipenv run python sdl3-simple.py
+pip install -r requirements.txt
+echo NOTE: if requirements are satified, you may now launch from applications .py scripts
+pause
