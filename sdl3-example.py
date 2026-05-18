@@ -35,15 +35,30 @@ def main(argc: ctypes.c_int, argv: sdl3.LP_c_char_p) -> ctypes.c_int:
     audioDrivers = [sdl3.SDL_GetAudioDriver(i).decode() for i in range(sdl3.SDL_GetNumAudioDrivers())]
     print(f"Available audio drivers: {', '.join(audioDrivers)} (current: {sdl3.SDL_GetCurrentAudioDriver().decode()}).")
 
-    if currentAudioDevice := sdl3.SDL_OpenAudioDevice(sdl3.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, None):
-        sdl3.Mix_Init(sdl3.MIX_INIT_WAVPACK)
-        sdl3.Mix_OpenAudio(currentAudioDevice, ctypes.byref(audioSpec := sdl3.SDL_AudioSpec()))
-        print(f"Current audio device: {sdl3.SDL_GetAudioDeviceName(currentAudioDevice).decode()}.")
-        chunks = [sdl3.Mix_LoadWAV(f"res/voice/{i}".encode()) for i in os.listdir("res/voice")]
-        currentIndex, channel = 0, 0
+    mixer, track, audios = None, None, []
+    currentIndex = 0
 
+    if sdl3.MIX_Init():
+        mixer = sdl3.MIX_CreateMixerDevice(sdl3.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, None)
+
+        if mixer:
+            track = sdl3.MIX_CreateTrack(mixer)
+
+            if track:
+                audios = [
+                    audio for audio in
+                    (sdl3.MIX_LoadAudio(mixer, f"res/voice/{i}".encode(), True) for i in os.listdir("res/voice"))
+                    if audio
+                ]
+
+                if not audios:
+                    print("No voice audio clips could be loaded.")
+            else:
+                print(f"Failed to create audio track: {sdl3.SDL_GetError().decode()}.")
+        else:
+            print(f"Failed to create mixer device: {sdl3.SDL_GetError().decode()}.")
     else:
-        print(f"Failed to open audio device: {sdl3.SDL_GetAudioDeviceName(sdl3.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK).decode()}, error: {sdl3.SDL_GetError().decode()}.")
+        print(f"Failed to initialize SDL_mixer: {sdl3.SDL_GetError().decode()}.")
 
     surface = sdl3.IMG_Load("res/example.png".encode())
     texture = sdl3.SDL_CreateTextureFromSurface(renderer, surface)
@@ -79,11 +94,20 @@ def main(argc: ctypes.c_int, argv: sdl3.LP_c_char_p) -> ctypes.c_int:
         frect.w, frect.h = frect.w * width.value / frect.w * scale, frect.h * width.value / frect.w * scale
         frect.x, frect.y = width.value / 2 - frect.w / 2, height.value / 2 - frect.h / 2
 
-        if currentAudioDevice and not sdl3.Mix_Playing(channel):
-            channel = sdl3.Mix_PlayChannel(-1, chunks[currentIndex], 1)
-            if (currentIndex := currentIndex + 1) >= len(chunks): currentIndex = 0
+        if track and audios and not sdl3.MIX_TrackPlaying(track):
+            if not sdl3.MIX_SetTrackAudio(track, audios[currentIndex]):
+                print(f"Failed to set track audio: {sdl3.SDL_GetError().decode()}.")
+                return -1
 
-        lastTime, deltaTime = time.time(), time.time() - lastTime
+            if not sdl3.MIX_PlayTrack(track, 0):
+                print(f"Failed to play audio track: {sdl3.SDL_GetError().decode()}.")
+                return -1
+
+            if (currentIndex := currentIndex + 1) >= len(audios): currentIndex = 0
+
+        now = time.time()
+        deltaTime = now - lastTime
+        lastTime = now
         hue, frames = (hue + 0.5 * deltaTime) % 1.0, frames + 1.0
         sdl3.SDL_SetRenderDrawColorFloat(renderer, *colorsys.hsv_to_rgb(hue, 1.0, 0.1), 1.0)
         sdl3.SDL_RenderClear(renderer)
@@ -118,12 +142,17 @@ def main(argc: ctypes.c_int, argv: sdl3.LP_c_char_p) -> ctypes.c_int:
         sdl3.SDL_DestroySurface(textSurface)
         sdl3.SDL_DestroyTexture(textTexture)
 
-    if currentAudioDevice:
-        for i in chunks:
-            sdl3.Mix_FreeChunk(i)
+    if track is not None:
+        sdl3.MIX_DestroyTrack(track)
 
-        sdl3.Mix_CloseAudio()
-        sdl3.Mix_Quit()
+    if mixer is not None:
+        for audio in audios:
+            sdl3.MIX_DestroyAudio(audio)
+
+        sdl3.MIX_DestroyMixer(mixer)
+
+    if mixer is not None or track is not None:
+        sdl3.MIX_Quit()
 
     sdl3.TTF_CloseFont(font)
     sdl3.TTF_Quit()
